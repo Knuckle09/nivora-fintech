@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut
 } from "lucide-react";
+import { RealtimeSync } from "@/components/layout/realtime-sync";
 import { QuickAddTransaction } from "@/components/transactions/quick-add";
 import type { Account, Category } from "@/lib/finance-types";
 
@@ -80,7 +81,7 @@ export function AppShell({
           <Link className="wordmark mobile-brand" href="/dashboard" aria-label="Nivora overview">
             <span className="brand-mark" aria-hidden="true"><span /></span><span>Nivora</span>
           </Link>
-          <div className="topbar-meta"><span className="topbar-divider" /><span>INR · India</span></div>
+          <div className="topbar-meta"><RealtimeSync /><span className="topbar-divider" /><span>INR · India</span></div>
           <QuickAddTransaction categories={categories} accounts={accounts} compact />
         </header>
         <main className="page-content">{children}</main>
