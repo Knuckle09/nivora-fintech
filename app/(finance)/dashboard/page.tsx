@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, Plus, WalletCards } from "lucide-react";
 import { QuickAddTransaction } from "@/components/transactions/quick-add";
+import { PortfolioComposition } from "@/components/portfolio/composition";
 import { getFinanceData } from "@/lib/finance-data";
 import { formatDate, formatINR, monthLabel } from "@/lib/format";
 
@@ -53,6 +54,8 @@ export default async function DashboardPage() {
           <div className="empty-state account-empty"><span className="empty-mark"><WalletCards size={20} aria-hidden="true" /></span><div><h3>Your first account starts here</h3><p>Add your checking, savings, or investment account to begin tracking your money.</p></div><Link className="button button-secondary" href="/accounts/new"><Plus size={16} aria-hidden="true" />Add an account</Link></div>
         )}
       </section>
+
+      <PortfolioComposition accounts={data.accounts} />
 
       <section className="section-block activity-section" aria-labelledby="recent-title">
         <div className="section-heading"><div><p className="eyebrow">THE LATEST MOVEMENT</p><h2 id="recent-title">Recent activity</h2></div><Link className="text-link" href="/transactions">All transactions <ArrowRight size={15} aria-hidden="true" /></Link></div>
