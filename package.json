@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
     "verify:assistant": "node --conditions=react-server --import tsx scripts/verify-assistant.ts",
+    "verify:grounding": "node --import tsx scripts/verify-grounding.ts",
     "visual:check": "node scripts/visual-check.mjs"
   },
   "dependencies": {
