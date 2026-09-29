@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { APIError } from "openai";
 import { cannotVerify, getPlannedExpenseRupees, resolveAnswer } from "@/lib/assistant/evidence";
+import { describeAssistantFailure } from "@/lib/assistant/failure";
 import type { EvidenceFact } from "@/lib/assistant/evidence";
 import { monthBounds } from "@/lib/format";
 
@@ -11,6 +13,15 @@ assert.equal(resolveAnswer("Food spending was ₹900.", facts, true), cannotVeri
 assert.equal(resolveAnswer("Food spending was {{fact:invented}}.", facts, true), cannotVerify);
 assert.equal(resolveAnswer(`Food spending was {{fact:${fact.id}}}.`, facts, false), cannotVerify);
 assert.equal(resolveAnswer("Food spending was one thousand rupees.", facts, true), cannotVerify);
+
+const billingError = new APIError(429, { code: "insufficient_quota", message: "No credits remaining." }, undefined, new Headers());
+assert.match(describeAssistantFailure(billingError).message, /no available credits/i);
+assert.equal(describeAssistantFailure(billingError).status, 503);
+const rateLimitError = new APIError(429, { code: "rate_limit_exceeded", message: "Too many requests." }, undefined, new Headers());
+assert.match(describeAssistantFailure(rateLimitError).message, /too many requests/i);
+const keyError = new APIError(401, { code: "invalid_api_key", message: "Invalid key." }, undefined, new Headers());
+assert.match(describeAssistantFailure(keyError).message, /configured API key/i);
+assert.equal(describeAssistantFailure(new Error("database details")).status, 502);
 
 assert.equal(getPlannedExpenseRupees("Can I afford a ₹40,000 expense this month?"), 40_000);
 assert.equal(getPlannedExpenseRupees("Can I afford 40000 rupee this month?"), 40_000);

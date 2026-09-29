@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { APIError } from "openai";
 import { z } from "zod";
 import { hasSupabasePublicEnv } from "@/lib/env";
+import { describeAssistantFailure } from "@/lib/assistant/failure";
 import { runGroundedAssistant } from "@/lib/assistant/respond";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -34,7 +36,19 @@ export async function POST(request: Request) {
       priorQuestions: parsed.data.priorQuestions
     });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return NextResponse.json({ error: "Nivora couldn't complete a verified lookup. Please try again." }, { status: 502 });
+  } catch (error) {
+    if (error instanceof APIError) {
+      console.error("[assistant] OpenAI request failed", {
+        status: error.status,
+        code: error.code,
+        requestId: error.requestID
+      });
+    } else {
+      console.error("[assistant] request failed", {
+        name: error instanceof Error ? error.name : "UnknownError"
+      });
+    }
+    const failure = describeAssistantFailure(error);
+    return NextResponse.json({ error: failure.message }, { status: failure.status });
   }
 }

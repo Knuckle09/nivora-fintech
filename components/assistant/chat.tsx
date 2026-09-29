@@ -26,7 +26,6 @@ export function AssistantChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
-  const [error, setError] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -34,7 +33,6 @@ export function AssistantChat() {
   async function send(text = draft) {
     const question = text.trim();
     if (!question || thinking) return;
-    setError("");
     setDraft("");
     setThinking(true);
     const priorQuestions = messages.filter((message) => message.role === "user").map((message) => message.content).slice(-4);
@@ -51,8 +49,7 @@ export function AssistantChat() {
       setMessages((current) => [...current, { role: "assistant", content: result.answer, lookups: result.lookups }]);
     } catch (caught) {
       const failure = caught instanceof Error ? caught.message : "Nivora couldn't finish this lookup. Please try again.";
-      setError(failure);
-      setMessages((current) => [...current, { role: "assistant", content: "I couldn't complete a verified lookup just now. Your question is still here; please try again in a moment.", failed: true }]);
+      setMessages((current) => [...current, { role: "assistant", content: failure, failed: true }]);
     } finally {
       setThinking(false);
       window.requestAnimationFrame(() => historyEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));
@@ -82,7 +79,7 @@ export function AssistantChat() {
           {message.role === "assistant" && <span className="message-author">Nivora</span>}
           <p>{message.content}</p>
           {message.lookups?.length ? <div className="message-lookups" aria-label="Data checked for this answer"><span className="lookup-check"><Check size={12} aria-hidden="true" />Checked</span>{message.lookups.map((lookup, lookupIndex) => <span className="lookup-chip" key={`${lookup.source}-${lookupIndex}`}>{lookupDescription(lookup)}{lookup.complete === false ? " · incomplete" : ""}</span>)}</div> : null}
-          {message.failed && <span className="message-failure"><CircleAlert size={13} aria-hidden="true" /> No figures were returned.</span>}
+          {message.failed && <span className="message-failure"><CircleAlert size={13} aria-hidden="true" /> No verified answer was returned.</span>}
         </div>
       </article>)}
       {thinking && <div className="chat-message chat-message-assistant" role="status"><span className="assistant-avatar message-avatar"><Sparkles size={16} aria-hidden="true" /></span><div className="chat-message-body"><span className="message-author">Nivora</span><p className="thinking-copy"><LoaderCircle size={15} className="spin" aria-hidden="true" />Checking your accounts and transactions...</p></div></div>}
@@ -96,7 +93,6 @@ export function AssistantChat() {
       <textarea id="assistant-question" ref={textareaRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={handleKeyDown} maxLength={1200} rows={2} placeholder="Ask about your money..." disabled={thinking} />
       <div className="composer-footer"><span>{thinking ? "Reviewing your ledger" : "Your data stays scoped to your account"}</span><button className="send-button" type="submit" disabled={thinking || !draft.trim()} aria-label="Send question">{thinking ? <LoaderCircle size={17} className="spin" aria-hidden="true" /> : <ArrowUp size={18} aria-hidden="true" />}</button></div>
     </form>
-    {error && <p className="chat-error" role="status"><CircleAlert size={14} aria-hidden="true" />{error}</p>}
     <p className="assistant-footnote">Nivora can explain recorded activity. It does not provide investment, tax, or credit advice.</p>
   </section>;
 }
