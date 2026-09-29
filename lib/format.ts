@@ -30,7 +30,8 @@ export function monthBounds(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
-    month: "2-digit"
+    month: "2-digit",
+    day: "2-digit"
   }).formatToParts(date);
   const year = Number(parts.find((part) => part.type === "year")?.value);
   const month = Number(parts.find((part) => part.type === "month")?.value);
