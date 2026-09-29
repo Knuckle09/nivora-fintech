@@ -130,13 +130,14 @@ async function main() {
     const accountId = accountIds.get(input.account);
     const categoryId = input.category ? categoryIds.get(input.category) : null;
     if (!accountId || (input.category && !categoryId)) throw new Error(`Seed reference missing for ${input.key}.`);
+    const amountMinor = Math.round(input.amountRupees * 100);
     rows.push({
       user_id: userId!,
       account_id: accountId,
       category_id: categoryId ?? null,
       merchant: input.merchant,
       description: input.description,
-      amount_minor: Math.round(input.amountRupees * 100),
+      amount_minor: input.type === "expense" ? -Math.abs(amountMinor) : input.type === "income" ? Math.abs(amountMinor) : amountMinor,
       transaction_type: input.type,
       occurred_on: input.date,
       transfer_group_id: input.transferKey ? stableUuid(`${userId}:${input.transferKey}`) : null,
@@ -240,6 +241,16 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Seeding failed.");
+  if (error instanceof Error) {
+    console.error(error.message);
+  } else if (error && typeof error === "object") {
+    const fields = error as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const detail = [fields.message, fields.details, fields.hint, fields.code]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" | ");
+    console.error(detail || "Seeding failed.");
+  } else {
+    console.error("Seeding failed.");
+  }
   process.exitCode = 1;
 });
