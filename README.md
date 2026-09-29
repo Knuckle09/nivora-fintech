@@ -4,7 +4,9 @@ Nivora is an AI-augmented personal-finance workspace built around a clear accoun
 
 ![Nivora sign-in screen](public/nivora-login.png)
 
-The screenshot shows the real sign-in surface. A live dashboard requires your own Supabase project and signed-in account; the repository contains no mock session or shared demo credentials.
+**Live demo:** [nivora-fintech.vercel.app](https://nivora-fintech.vercel.app)
+
+The live preview uses a separate Supabase project with synthetic, seeded INR activity and real email/password authentication. Demo credentials are shared directly for portfolio review and are deliberately not stored in this public repository.
 
 ## What it does
 
@@ -59,14 +61,14 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the end-to-end Responses API loop, 
 
 ## Deployment
 
-The app is Vercel-ready, but this repository has not been connected to a Vercel account or deployed yet. To deploy it:
+The production app is deployed on Vercel and connected to a dedicated Supabase project. To create another deployment:
 
-1. Push/import this GitHub repository in Vercel and keep the framework preset as Next.js.
-2. In **Project → Settings → Environment Variables**, add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `OPENAI_API_KEY`. `OPENAI_MODEL` is optional; the default is `gpt-4.1-mini`. Apply them to the environments you intend to use, then redeploy.
-3. Run the SQL migration in the production Supabase project. Add the production URL and `https://<your-domain>/auth/callback` under Supabase Auth URL Configuration.
-4. If you want seeded portfolio data, run `npm run seed` locally against that Supabase project using its service-role key in the ignored `.env.local`. Keep the service-role key and seed-user password off Vercel and out of Git.
+1. Import this GitHub repository in Vercel and keep the framework preset as Next.js.
+2. In **Project → Settings → Environment Variables**, add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `OPENAI_API_KEY` for Production. `OPENAI_MODEL` is optional; the default is `gpt-4.1-mini`. Redeploy after changing environment variables.
+3. In Supabase Auth URL Configuration, set the Site URL to `https://nivora-fintech.vercel.app` and allow `https://nivora-fintech.vercel.app/auth/callback` plus `http://localhost:3000/auth/callback`.
+4. Apply the SQL migration and seed from a trusted machine when using a new Supabase project. Keep the service-role key and seed-user password off Vercel and out of Git.
 
-There is no live URL yet; one should be added here after the project is linked and deployed.
+The live URL is `https://nivora-fintech.vercel.app`. The OpenAI key is server-side configuration only; it must never be committed or exposed through a `NEXT_PUBLIC_` variable.
 
 ## Adversarial self-review
 
