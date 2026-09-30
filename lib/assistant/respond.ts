@@ -1,7 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ResponseInputItem } from "openai/resources/responses/responses";
+import type { ChatCompletionMessageFunctionToolCall, ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { formatINR } from "@/lib/format";
 import { cannotVerify, getPlannedExpenseRupees, resolveAnswer, type EvidenceFact } from "@/lib/assistant/evidence";
 import { assistantTools, executeAssistantTool, getAssistantDirectory } from "@/lib/assistant/tools";
@@ -24,31 +24,36 @@ export async function runGroundedAssistant({
   message: string;
   priorQuestions?: string[];
 }) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("The assistant is not configured.");
   const affordabilityQuestion = /\b(?:afford|enough for|left after|remaining after)\b/i.test(message);
   const plannedExpenseRupees = affordabilityQuestion ? getPlannedExpenseRupees(message) : null;
   if (affordabilityQuestion && plannedExpenseRupees === null) {
     return { answer: amountRequired, lookups: [], grounded: false };
   }
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
-  const openai = new OpenAI({ apiKey, timeout: 30_000, maxRetries: 1 });
+  const model = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+  const groq = new OpenAI({
+    apiKey,
+    baseURL: "https://api.groq.com/openai/v1",
+    timeout: 30_000,
+    maxRetries: 1
+  });
   const directory = await getAssistantDirectory(supabase, userId);
   const context = `Today is ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())} in India. User currency is INR. Valid accounts: ${JSON.stringify(directory.accounts)}. Valid categories: ${JSON.stringify(directory.categories.map(({ id, name, slug, kind }) => ({ id, name, slug, kind })))}. Use the current date for relative date ranges. All range end dates are inclusive. For an affordability question, call getAccountBalance with accountId null and plannedExpenseRupees set to the amount stated by the user. For a general balance question, call getAccountBalance. For category spend, call getSpendingByCategory. For individual merchants or transaction explanations, call getTransactions with the exact category ID when filtering. If the request is outside those capabilities, make a relevant lookup if possible, then explain the limit without guessing.`;
-  const input: ResponseInputItem[] = [
+  const messages: ChatCompletionMessageParam[] = [
+    { role: "system", content: instructions },
     ...priorQuestions.slice(-4).map((question) => ({ role: "user" as const, content: question })),
-    { role: "user" as const, content: `${context}\n\nCurrent question: ${message}` }
+    { role: "user", content: `${context}\n\nCurrent question: ${message}` }
   ];
 
-  let response = await openai.responses.create({
+  let response = await groq.chat.completions.create({
     model,
-    instructions,
-    input,
+    messages,
     tools: assistantTools,
-    tool_choice: plannedExpenseRupees === null ? "required" : { type: "function", name: "getAccountBalance" },
-    parallel_tool_calls: false,
-    max_output_tokens: 500,
-    store: false
+    tool_choice: plannedExpenseRupees === null
+      ? "required"
+      : { type: "function", function: { name: "getAccountBalance" } },
+    max_completion_tokens: 500
   });
   const facts = new Map<string, EvidenceFact>();
   const lookups: AssistantLookup[] = [];
@@ -56,25 +61,40 @@ export async function runGroundedAssistant({
   let allResultsComplete = true;
 
   while (callCount < maximumToolCalls) {
-    const calls = response.output.filter((item) => item.type === "function_call");
+    const choice = response.choices[0];
+    if (!choice) return { answer: cannotVerify, lookups, grounded: false };
+    const calls = choice.message.tool_calls ?? [];
     if (!calls.length) {
-      const text = response.output_text;
+      const text = choice.message.content ?? "";
       return {
         answer: callCount === 0 ? cannotVerify : resolveAnswer(text, facts, allResultsComplete),
         lookups,
-        grounded: callCount > 0 && allResultsComplete && response.output_text.length > 0
+        grounded: callCount > 0 && allResultsComplete && text.length > 0
       };
     }
 
-    const outputs: { type: "function_call_output"; call_id: string; output: string }[] = [];
-    for (const call of calls) {
+    if (calls.length > maximumToolCalls - callCount) return { answer: cannotVerify, lookups, grounded: false };
+    const functionCalls = calls.filter((call): call is ChatCompletionMessageFunctionToolCall => call.type === "function");
+    if (functionCalls.length !== calls.length) return { answer: cannotVerify, lookups, grounded: false };
+    messages.push({
+      role: "assistant",
+      content: choice.message.content,
+      tool_calls: functionCalls.map((call) => ({
+        id: call.id,
+        type: "function",
+        function: { name: call.function.name, arguments: call.function.arguments }
+      }))
+    });
+    for (const call of functionCalls) {
       callCount += 1;
-      if (callCount > maximumToolCalls) break;
-      if (plannedExpenseRupees !== null && call.name !== "getAccountBalance") return { answer: cannotVerify, lookups, grounded: false };
+      const toolName = call.function.name;
+      if (plannedExpenseRupees !== null && toolName !== "getAccountBalance") {
+        return { answer: cannotVerify, lookups, grounded: false };
+      }
       const rawArguments = plannedExpenseRupees === null
-        ? call.arguments
+        ? call.function.arguments
         : JSON.stringify({ accountId: null, plannedExpenseRupees });
-      const result = await executeAssistantTool(supabase, userId, call.name, rawArguments);
+      const result = await executeAssistantTool(supabase, userId, toolName, rawArguments);
       result.facts.forEach((fact) => facts.set(fact.id, fact));
       lookups.push(result.checked);
       if (result.checked.complete === false) allResultsComplete = false;
@@ -89,22 +109,19 @@ export async function runGroundedAssistant({
           grounded: true
         };
       }
-      input.push(call);
-      outputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) });
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: JSON.stringify(result)
+      });
     }
-    if (callCount >= maximumToolCalls && !outputs.length) break;
 
-    input.push(...outputs);
-
-    response = await openai.responses.create({
+    response = await groq.chat.completions.create({
       model,
-      instructions,
-      input,
+      messages,
       tools: assistantTools,
-      tool_choice: "auto",
-      parallel_tool_calls: false,
-      max_output_tokens: 500,
-      store: false
+      tool_choice: callCount >= maximumToolCalls ? "none" : "auto",
+      max_completion_tokens: 500
     });
   }
 

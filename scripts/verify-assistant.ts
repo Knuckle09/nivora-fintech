@@ -9,8 +9,8 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const email = process.env.SEED_USER_EMAIL;
 const password = process.env.SEED_USER_PASSWORD;
 
-if (!url || !anonKey || !email || !password || !process.env.OPENAI_API_KEY) {
-  throw new Error("Set Supabase URL/key, OpenAI API key, and the seeded user's email/password before running live assistant checks.");
+if (!url || !anonKey || !email || !password || !process.env.GROQ_API_KEY) {
+  throw new Error("Set Supabase URL/key, Groq API key, and the seeded user's email/password before running live assistant checks.");
 }
 const userEmail = email;
 const userPassword = password;

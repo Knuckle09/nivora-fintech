@@ -17,48 +17,51 @@ const balanceArgs = z.object({
 export const assistantTools = [
   {
     type: "function" as const,
-    name: "getTransactions",
-    description: "Read the signed-in user's actual transactions in an inclusive date range. Use a category ID from the supplied category list, or null for all categories. Dates must be exact calendar dates.",
-    strict: true,
-    parameters: {
-      type: "object",
-      properties: {
-        startDate: { type: "string", description: "Inclusive start date in YYYY-MM-DD format." },
-        endDate: { type: "string", description: "Inclusive end date in YYYY-MM-DD format." },
-        category: { type: ["string", "null"], description: "A category ID from the supplied list, or null." }
+    function: {
+      name: "getTransactions",
+      description: "Read the signed-in user's actual transactions in an inclusive date range. Use a category ID from the supplied category list, or null for all categories. Dates must be exact calendar dates.",
+      parameters: {
+        type: "object",
+        properties: {
+          startDate: { type: "string", description: "Inclusive start date in YYYY-MM-DD format." },
+          endDate: { type: "string", description: "Inclusive end date in YYYY-MM-DD format." },
+          category: { type: ["string", "null"], description: "A category ID from the supplied list, or null." }
+        },
+        required: ["startDate", "endDate", "category"],
+        additionalProperties: false
       },
-      required: ["startDate", "endDate", "category"],
-      additionalProperties: false
     }
   },
   {
     type: "function" as const,
-    name: "getSpendingByCategory",
-    description: "Calculate expense totals grouped by category from the signed-in user's real transactions for an inclusive date range. Transfers are excluded.",
-    strict: true,
-    parameters: {
-      type: "object",
-      properties: {
-        startDate: { type: "string", description: "Inclusive start date in YYYY-MM-DD format." },
-        endDate: { type: "string", description: "Inclusive end date in YYYY-MM-DD format." }
+    function: {
+      name: "getSpendingByCategory",
+      description: "Calculate expense totals grouped by category from the signed-in user's real transactions for an inclusive date range. Transfers are excluded.",
+      parameters: {
+        type: "object",
+        properties: {
+          startDate: { type: "string", description: "Inclusive start date in YYYY-MM-DD format." },
+          endDate: { type: "string", description: "Inclusive end date in YYYY-MM-DD format." }
+        },
+        required: ["startDate", "endDate"],
+        additionalProperties: false
       },
-      required: ["startDate", "endDate"],
-      additionalProperties: false
     }
   },
   {
     type: "function" as const,
-    name: "getAccountBalance",
-    description: "Read the signed-in user's current computed account balance. Pass an account ID from the supplied account list for one account, or null to total all accounts. For an affordability check, pass the planned expense in whole INR so the server can calculate the post-expense balance.",
-    strict: true,
-    parameters: {
-      type: "object",
-      properties: {
-        accountId: { type: ["string", "null"], description: "UUID from the supplied account list, or null for all accounts." },
-        plannedExpenseRupees: { type: ["integer", "null"], description: "A user-stated planned expense in whole INR, or null." }
+    function: {
+      name: "getAccountBalance",
+      description: "Read the signed-in user's current computed account balance. Pass an account ID from the supplied account list for one account, or null to total all accounts. For an affordability check, pass the planned expense in whole INR so the server can calculate the post-expense balance.",
+      parameters: {
+        type: "object",
+        properties: {
+          accountId: { type: ["string", "null"], description: "UUID from the supplied account list, or null for all accounts." },
+          plannedExpenseRupees: { type: ["integer", "null"], description: "A user-stated planned expense in whole INR, or null." }
+        },
+        required: ["accountId", "plannedExpenseRupees"],
+        additionalProperties: false
       },
-      required: ["accountId", "plannedExpenseRupees"],
-      additionalProperties: false
     }
   }
 ];
@@ -80,6 +83,8 @@ type ToolResult = {
   facts: { id: string; valueMinor: number; label: string }[];
   [key: string]: unknown;
 };
+
+const transactionDetailsLimit = 40;
 
 function dateValue(value: string) {
   const [year, month, day] = value.split("-").map(Number);
@@ -185,8 +190,8 @@ export async function executeAssistantTool(
       found: rows.length > 0,
       totalTransactions: rows.length,
       complete,
-      transactionDetailsComplete: rows.length <= 80,
-      transactions: rows.slice(0, 80).map((row) => ({
+      transactionDetailsComplete: rows.length <= transactionDetailsLimit,
+      transactions: rows.slice(0, transactionDetailsLimit).map((row) => ({
         date: row.occurred_on,
         merchant: row.merchant,
         description: row.description,

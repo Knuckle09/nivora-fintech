@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to ask about your finances." }, { status: 401 });
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "The assistant needs an OpenAI API key before it can answer." }, { status: 503 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: "The assistant needs a Groq API key before it can answer." }, { status: 503 });
   }
 
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof APIError) {
-      console.error("[assistant] OpenAI request failed", {
+      console.error("[assistant] Groq request failed", {
         status: error.status,
         code: error.code,
         requestId: error.requestID

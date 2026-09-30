@@ -14,13 +14,10 @@ assert.equal(resolveAnswer("Food spending was {{fact:invented}}.", facts, true),
 assert.equal(resolveAnswer(`Food spending was {{fact:${fact.id}}}.`, facts, false), cannotVerify);
 assert.equal(resolveAnswer("Food spending was one thousand rupees.", facts, true), cannotVerify);
 
-const billingError = new APIError(429, { code: "insufficient_quota", message: "No credits remaining." }, undefined, new Headers());
-assert.match(describeAssistantFailure(billingError).message, /no available credits/i);
-assert.equal(describeAssistantFailure(billingError).status, 503);
 const rateLimitError = new APIError(429, { code: "rate_limit_exceeded", message: "Too many requests." }, undefined, new Headers());
-assert.match(describeAssistantFailure(rateLimitError).message, /too many requests/i);
+assert.match(describeAssistantFailure(rateLimitError).message, /Groq's free-plan rate or daily limit/i);
 const keyError = new APIError(401, { code: "invalid_api_key", message: "Invalid key." }, undefined, new Headers());
-assert.match(describeAssistantFailure(keyError).message, /configured API key/i);
+assert.match(describeAssistantFailure(keyError).message, /Groq rejected the configured API key/i);
 assert.equal(describeAssistantFailure(new Error("database details")).status, 502);
 
 assert.equal(getPlannedExpenseRupees("Can I afford a ₹40,000 expense this month?"), 40_000);
